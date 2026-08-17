@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>健身动作库 · 学习 & 训练方案</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171e26; --panel2:#1f2832; --line:#2a3440;
+    --text:#e6edf3; --muted:#9aa7b4; --accent:#ff5a5f; --accent2:#4cc9f0; --ok:#3ddc97;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.5}
+  header{position:sticky;top:0;z-index:20;background:rgba(15,20,25,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:700}
+  header h1 .em{color:var(--accent)}
+  .spacer{flex:1}
+  .tabbar{display:flex;gap:6px}
+  .tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .lang-pick{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+  select,input,textarea{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;outline:none}
+  select:focus,input:focus,textarea:focus{border-color:var(--accent2)}
+  main{max-width:1100px;margin:0 auto;padding:18px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .controls input[type=text]{flex:1;min-width:220px}
+  .count{color:var(--muted);font-size:13px;margin:6px 2px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .thumb{height:150px;background:#0b0f13;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .thumb img{max-width:100%;max-height:100%;object-fit:contain}
+  .card-body{padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .card-title{font-weight:600;font-size:15px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;padding:2px 7px;border-radius:999px}
+  .preview{color:var(--muted);font-size:13px;flex:1}
+  .link{background:none;border:none;color:var(--accent2);cursor:pointer;padding:0;font-size:13px;text-align:left}
+  .link:hover{text-decoration:underline}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal.open{display:flex}
+  .modal-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:18px}
+  .modal-box img{width:180px;height:180px;object-fit:contain;background:#0b0f13;border-radius:10px;float:right;margin-left:12px}
+  .modal-box h2{margin:0 0 10px;font-size:20px}
+  #modal-meta{margin:10px 0;display:flex;flex-wrap:wrap;gap:6px}
+  #modal-ins{white-space:pre-wrap;color:var(--text);margin:8px 0}
+  #modal-steps{margin:6px 0 10px;padding-left:20px}
+  #modal-steps li{margin:4px 0}
+  .close{float:right;cursor:pointer;color:var(--muted);font-size:22px;line-height:1}
+  .attr{color:var(--muted);font-size:11px;margin-top:8px}
+  /* plan form */
+  .form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:13px;color:var(--muted)}
+  .field.wide{grid-column:1/-1}
+  #focus-box{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:13px;cursor:pointer;user-select:none}
+  .chip input{accent-color:var(--accent)}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-size:15px;cursor:pointer;font-weight:600}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  /* plan output */
+  #plan-output{margin-top:18px;display:none}
+  #plan-output.show{display:block}
+  .plan-head{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  .plan-head h2{margin:0 0 8px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px}
+  .meta-row span{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:13px}
+  .routine{color:var(--muted);font-size:13px;margin-top:8px}
+  .risk{background:rgba(255,90,95,.1);border:1px solid rgba(255,90,95,.4);color:#ffb3b5;padding:10px 12px;border-radius:10px;margin-top:10px;font-size:13px}
+  .disclaim{color:var(--muted);font-size:12px}
+  .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .day{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .day-h{font-weight:700;margin-bottom:8px;color:var(--accent2)}
+  .ex-list{margin:0;padding-left:18px}
+  .ex-list li{margin:6px 0}
+  .sr{color:var(--ok);font-size:13px;margin-left:6px}
+  .note{color:var(--muted);font-size:12px;margin-top:8px}
+  .lhint{color:var(--muted);font-size:12px;margin-top:3px;padding-left:2px}
+  .warn{color:#ffb3b5}
+  footer{max-width:1100px;margin:24px auto;padding:0 18px;color:var(--muted);font-size:12px}
+  a{color:var(--accent2)}
+  @media print{
+    header,.controls,.form,.btn-row,.count,#modal{display:none!important}
+    body{background:#fff;color:#000}
+    .day,.plan-head{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏋️ 健身<span class="em">动作库</span> · 学习 & 训练方案</h1>
+  <div class="tabbar">
+    <button class="tab active" data-tab="learn">动作库 / 学习</button>
+    <button class="tab" data-tab="plan">训练方案生成</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="lang-pick">显示语言
+    <select id="lang"></select>
+  </div>
+</header>
+
+<main>
+  <!-- 学习区 -->
+  <section id="sec-learn">
+    <div class="controls">
+      <input type="text" id="search-input" placeholder="模糊搜索：动作名 / 部位 / 器械 / 目标肌 / 指导文字（中英文均可）">
+      <select id="f-bp"><option value="">全部部位</option></select>
+      <select id="f-eq"><option value="">全部器械</option></select>
+      <button class="btn" id="search-btn">搜索</button>
+    </div>
+    <div class="count" id="result-count"></div>
+    <div class="grid" id="results"></div>
+  </section>
+
+  <!-- 方案区 -->
+  <section id="sec-plan" style="display:none">
+    <div class="form">
+      <div class="field">
+        <label>训练目标</label>
+        <select id="p-goal">
+          <option value="hypertrophy">增肌</option>
+          <option value="fatloss">减脂</option>
+          <option value="strength">力量</option>
+          <option value="tone">塑形</option>
+          <option value="rehab">康复</option>
+          <option value="general">维持健康</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>训练水平</label>
+        <select id="p-level">
+          <option>新手</option><option>初级</option><option>中级</option><option>高级</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>可用器械</label>
+        <select id="p-equip">
+          <option>均可</option><option>自重</option><option>哑铃</option>
+          <option>杠铃</option><option>绳索</option><option>器械</option><option>弹力带</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>每周训练天数</label>
+        <select id="p-days">
+          <option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>单次时长</label>
+        <select id="p-dur">
+          <option value="30">30 分钟</option><option value="45" selected>45 分钟</option><option value="60">60 分钟</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>方案语言</label>
+        <select id="p-lang"></select>
+      </div>
+      <div class="field wide">
+        <label>重点部位（不选 = 全身均衡）</label>
+        <div id="focus-box"></div>
+      </div>
+      <div class="field wide">
+        <label>伤病史 / 限制（选填，例如：腰间盘突出、膝盖不适、肩伤）</label>
+        <textarea id="p-limit" rows="2" placeholder="可留空。填写后系统会自动避开相关高风险动作。"></textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="gen-btn">生成训练方案</button>
+      <button class="btn ghost" id="print-btn">打印 / 导出 PDF</button>
+    </div>
+
+    <div id="plan-output"></div>
+  </section>
+</main>
+
+<footer>
+  数据来源：<a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener">hasaneyldrm/exercises-dataset</a>
+  （1324 个动作，10 种语言指导，MIT 许可）。动作图片/GIF © Gym visual，经许可在本页以 180×180 引用，商用需自行授权。
+  训练方案由本地规则引擎基于本数据集生成，仅供参考。
+</footer>
+
+<!-- 详情弹窗 -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <span class="close" id="modal-close">×</span>
+    <img id="modal-gif" alt="">
+    <h2 id="modal-title"></h2>
+    <div id="modal-meta"></div>
+    <div id="modal-ins"></div>
+    <div style="font-weight:600;margin-top:6px">分步指导</div>
+    <ol id="modal-steps"></ol>
+    <div class="attr" id="modal-attr"></div>
+  </div>
+</div>
+
+<script src="exercises.data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
