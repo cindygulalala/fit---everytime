@@ -5,13 +5,14 @@
   const LANGS = ["zh", "en", "es", "it", "tr", "ru", "hi", "pl", "ko", "fr"];
   const LANG_LABEL = { zh: "中文", en: "English", es: "Español", it: "Italiano", tr: "Türkçe", ru: "Русский", hi: "हिन्दी", pl: "Polski", ko: "한국어", fr: "Français" };
 
-  const BP_LABEL = { back: "背", cardio: "有氧", chest: "胸", "lower arms": "前臂", "lower legs": "小腿", neck: "颈", shoulders: "肩", "upper arms": "上臂", "upper legs": "大腿", waist: "腰/核心" };
+  const BP_LABEL = { back: "背", cardio: "有氧", chest: "胸", glutes: "臀", "lower arms": "前臂", "lower legs": "小腿", neck: "颈", shoulders: "肩", "upper arms": "上臂", "upper legs": "大腿", waist: "腰/核心" };
   const EQUIP_LABEL = { "body weight": "自重", "dumbbell": "哑铃", "barbell": "杠铃", "cable": "绳索", "leverage machine": "器械", "kettlebell": "壶铃", "exercise ball": "健身球", "e-z bar": "EZ杆", "foam roll": "泡沫轴", "band": "弹力带", "trap bar": "六角杠", "medicine ball": "药球", "roller": "滚筒", "other": "其他", "none": "无" };
   const EQUIP_MAP = { "自重": "body weight", "哑铃": "dumbbell", "杠铃": "barbell", "绳索": "cable", "器械": "leverage machine", "弹力带": "band", "均可": null };
 
   const FOCUS_GROUPS = [
     { key: "chest", label: "胸" }, { key: "back", label: "背" },
-    { key: "upper legs", label: "大腿" }, { key: "lower legs", label: "小腿" },
+    { key: "upper legs", label: "大腿" }, { key: "glutes", label: "臀" },
+    { key: "lower legs", label: "小腿" },
     { key: "shoulders", label: "肩" }, { key: "upper arms", label: "上臂" },
     { key: "lower arms", label: "前臂" }, { key: "waist", label: "核心/腰" },
     { key: "cardio", label: "有氧" }, { key: "neck", label: "颈" }
@@ -192,13 +193,18 @@
     return { pool, notes };
   }
 
+  // 臀部动作在 DB 里 body_part="upper legs"，但 target 含 "glute"，需虚拟分类
+  function ePart(e) {
+    return (e.target || "").toLowerCase().includes("glute") ? "glutes" : e.body_part;
+  }
+
   function buildPlan(p) {
     const lang = p.lang;
     const equip = EQUIP_MAP[p.equipment];
     const focus = p.focus.length ? p.focus : FOCUS_GROUPS.map((g) => g.key).filter((k) => k !== "neck");
     let pool = EXERCISES.filter((e) => {
       if (equip && e.equipment !== equip) return false;
-      if (!focus.includes(e.body_part)) return false;
+      if (!focus.includes(ePart(e))) return false;
       return true;
     });
     const risk = applyRisk(p.limitations, pool);
@@ -206,7 +212,7 @@
     if (!pool.length) return `<p class="warn">没有匹配的动作，请放宽器械或重点部位条件。</p>`;
 
     const byPart = {};
-    pool.forEach((e) => { (byPart[e.body_part] = byPart[e.body_part] || []).push(e); });
+    pool.forEach((e) => { const pt = ePart(e); (byPart[pt] = byPart[pt] || []).push(e); });
     const parts = Object.keys(byPart);
 
     const perPart = { "新手": 3, "初级": 3, "中级": 4, "高级": 4 }[p.level] || 3;
