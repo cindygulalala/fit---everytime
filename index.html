@@ -78,6 +78,10 @@
   .note{color:var(--muted);font-size:12px;margin-top:8px}
   .lhint{color:var(--muted);font-size:12px;margin-top:3px;padding-left:2px}
   .warn{color:#ffb3b5}
+  .ptab{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
+  .ptab.active{background:var(--accent2);color:#fff;border-color:var(--accent2)}
+  .section-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .section-card .day-h{margin-bottom:8px}
   footer{max-width:1100px;margin:24px auto;padding:0 18px;color:var(--muted);font-size:12px}
   a{color:var(--accent2)}
   @media print{
@@ -115,62 +119,127 @@
 
   <!-- 方案区 -->
   <section id="sec-plan" style="display:none">
-    <div class="form">
-      <div class="field">
-        <label>训练目标</label>
-        <select id="p-goal">
-          <option value="hypertrophy">增肌</option>
-          <option value="fatloss">减脂</option>
-          <option value="strength">力量</option>
-          <option value="tone">塑形</option>
-          <option value="rehab">康复</option>
-          <option value="general">维持健康</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>训练水平</label>
-        <select id="p-level">
-          <option>新手</option><option>初级</option><option>中级</option><option>高级</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>可用器械</label>
-        <select id="p-equip">
-          <option>均可</option><option>自重</option><option>哑铃</option>
-          <option>杠铃</option><option>绳索</option><option>器械</option><option>弹力带</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>每周训练天数</label>
-        <select id="p-days">
-          <option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>单次时长</label>
-        <select id="p-dur">
-          <option value="30">30 分钟</option><option value="45" selected>45 分钟</option><option value="60">60 分钟</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>方案语言</label>
-        <select id="p-lang"></select>
-      </div>
-      <div class="field wide">
-        <label>重点部位（不选 = 全身均衡）</label>
-        <div id="focus-box"></div>
-      </div>
-      <div class="field wide">
-        <label>伤病史 / 限制（选填，例如：腰间盘突出、膝盖不适、肩伤）</label>
-        <textarea id="p-limit" rows="2" placeholder="可留空。填写后系统会自动避开相关高风险动作。"></textarea>
-      </div>
-    </div>
-    <div class="btn-row">
-      <button class="btn" id="gen-btn">生成训练方案</button>
-      <button class="btn ghost" id="print-btn">打印 / 导出 PDF</button>
+    <div class="tabbar" style="margin-bottom:16px">
+      <button class="ptab active" data-ptab="weekly">📅 周计划</button>
+      <button class="ptab" data-ptab="single">⚡ 今日单次</button>
     </div>
 
-    <div id="plan-output"></div>
+    <!-- 周计划 -->
+    <div id="ptab-weekly">
+      <div class="form">
+        <div class="field">
+          <label>训练目标</label>
+          <select id="p-goal">
+            <option value="hypertrophy">增肌</option>
+            <option value="fatloss">减脂</option>
+            <option value="strength">力量</option>
+            <option value="tone">塑形</option>
+            <option value="rehab">康复</option>
+            <option value="general">维持健康</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>训练水平</label>
+          <select id="p-level">
+            <option>新手</option><option>初级</option><option>中级</option><option>高级</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>可用器械</label>
+          <select id="p-equip">
+            <option>均可</option><option>自重</option><option>哑铃</option>
+            <option>杠铃</option><option>绳索</option><option>器械</option><option>弹力带</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>每周训练天数</label>
+          <select id="p-days">
+            <option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>单次时长</label>
+          <select id="p-dur">
+            <option value="30">30 分钟</option><option value="45" selected>45 分钟</option><option value="60">60 分钟</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>方案语言</label>
+          <select id="p-lang"></select>
+        </div>
+        <div class="field wide">
+          <label>重点部位（不选 = 全身均衡）</label>
+          <div id="focus-box"></div>
+        </div>
+        <div class="field wide">
+          <label>伤病史 / 限制（选填，例如：腰间盘突出、膝盖不适、肩伤）</label>
+          <textarea id="p-limit" rows="2" placeholder="可留空。填写后系统会自动避开相关高风险动作。"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="gen-btn">生成训练方案</button>
+        <button class="btn ghost" id="print-btn">打印 / 导出 PDF</button>
+      </div>
+      <div id="plan-output"></div>
+    </div>
+
+    <!-- 今日单次 -->
+    <div id="ptab-single" style="display:none">
+      <div class="form">
+        <div class="field">
+          <label>训练目的</label>
+          <select id="s-goal">
+            <option value="hypertrophy">增肌</option>
+            <option value="fatloss">减脂</option>
+            <option value="strength">力量</option>
+            <option value="tone">塑形</option>
+            <option value="rehab">康复 / 恢复</option>
+            <option value="general">维持健康</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>可用器械</label>
+          <select id="s-equip">
+            <option>均可</option><option>自重</option><option>哑铃</option>
+            <option>杠铃</option><option>绳索</option><option>器械</option><option>弹力带</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>今日可用时长</label>
+          <select id="s-dur">
+            <option value="30">30 分钟</option>
+            <option value="45" selected>45 分钟</option>
+            <option value="60">60 分钟</option>
+            <option value="90">90 分钟</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>今日状态</label>
+          <select id="s-energy">
+            <option value="充沛">💪 充沛——可冲高强度</option>
+            <option value="正常" selected>😊 正常</option>
+            <option value="有限">😴 有限——轻量恢复即可</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>方案语言</label>
+          <select id="s-lang"></select>
+        </div>
+        <div class="field wide">
+          <label>今日重点部位（选 1–3 个，不选则自动推荐）</label>
+          <div id="single-focus-box"></div>
+        </div>
+        <div class="field wide">
+          <label>伤病史 / 限制（选填）</label>
+          <textarea id="s-limit" rows="2" placeholder="可留空。填写后系统会自动避开相关高风险动作。"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="s-gen-btn">生成今日训练</button>
+        <button class="btn ghost" id="s-print-btn">打印 / 导出 PDF</button>
+      </div>
+      <div id="single-output"></div>
+    </div>
   </section>
 </main>
 

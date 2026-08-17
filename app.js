@@ -30,6 +30,56 @@
     general: { sets: "3", reps: "10", rest: "60 秒" }
   };
 
+  // 今日单次：状态 → 训练量调整
+  const ENERGY_CONFIG = {
+    "充沛": { setsNote: "可在标准组数基础上多加 1 组，适当冲击大重量。", label: "💪 充沛" },
+    "正常": { setsNote: "", label: "😊 正常" },
+    "有限": { setsNote: "以轻重量、慢节奏为主，不要力竭，专注感受肌肉。", label: "😴 有限" }
+  };
+
+  // 时长 → 主训练动作数
+  const TIME_TO_EX = { 30: 4, 45: 6, 60: 8, 90: 10 };
+
+  // 热身动作（按部位）
+  const WARMUP = {
+    chest:        ["弹力带扩胸 × 20", "肩绕环（前后各 10 圈）", "俯卧撑热身 × 10（轻松节奏）"],
+    back:         ["猫牛式 × 10", "肩胛骨内收外展 × 20", "空拉（模拟引体轨迹，无重量）× 15"],
+    "upper legs": ["动态腿摆动（前后/侧向各 15 次）", "空气深蹲 × 20", "踏步高抬腿 × 30"],
+    glutes:       ["臀桥（无重量）× 20", "蚌式开合 × 15（每侧）", "髋绕环（每侧 10 圈）"],
+    shoulders:    ["肩绕环 × 20（前后各 10）", "面拉（弹力带/轻绳索）× 15", "侧平举热身（极轻）× 12"],
+    "upper arms": ["腕绕环 × 20", "轻重量弯举热身 × 15", "三头绳下压热身（极轻）× 15"],
+    "lower legs": ["踮脚尖站立 × 20", "脚踝绕环（每侧 10 圈）", "小腿拉伸（靠墙）30 秒 × 2"],
+    "lower arms": ["腕绕环（正反各 10）", "轻量腕弯举 × 15", "手指张开握紧 × 20"],
+    waist:        ["腹式深呼吸 × 10", "死虫式 × 10（每侧）", "鸟狗式 × 10（每侧）"],
+    cardio:       ["原地高抬腿 1 分钟", "开合跳 1 分钟", "手臂绕环放松 30 秒"],
+    neck:         ["颈部前后侧伸展（各 15 秒）", "颈部缓慢绕环（每方向 5 圈）"]
+  };
+
+  // 放松拉伸（按部位）
+  const COOLDOWN = {
+    chest:        ["门框胸展：手扶门框身体前倾，每侧 30 秒", "交叉手臂肩前拉伸 30 秒"],
+    back:         ["婴儿式 60 秒", "坐姿体前屈 30 秒 × 2", "下犬式 30 秒"],
+    "upper legs": ["股四头肌站立拉伸（每侧 30 秒）", "腘绳肌坐姿拉伸 30 秒", "鸽子式（每侧 40 秒）"],
+    glutes:       ["鸽子式（每侧 45 秒）", "仰卧 4 字拉伸（每侧 30 秒）", "梨状肌仰卧拉伸 30 秒"],
+    shoulders:    ["手臂横跨胸前拉伸（每侧 30 秒）", "肩后侧伸展 30 秒", "颈肩侧拉伸 20 秒"],
+    "upper arms": ["三头肌过头拉伸（每侧 30 秒）", "肱二头肌墙壁拉伸 30 秒"],
+    "lower legs": ["小腿站立拉伸（每侧 30 秒）", "足底筋膜滚压 1 分钟"],
+    "lower arms": ["腕部正反拉伸（各 20 秒）", "手指伸展抖动 × 10"],
+    waist:        ["猫牛式 × 10", "侧卧脊柱扭转（每侧 30 秒）", "眼镜蛇式 30 秒"],
+    cardio:       ["慢走放松 3 分钟", "下肢主要肌群静态拉伸各 30 秒"],
+    neck:         ["颈部各方向静态拉伸（各 20 秒）"]
+  };
+
+  // 自动推荐部位组合（当用户未选择时）
+  const AUTO_FOCUS_COMBOS = [
+    ["chest", "upper arms"],
+    ["back", "upper arms"],
+    ["upper legs", "glutes"],
+    ["shoulders", "chest"],
+    ["back", "waist"],
+    ["glutes", "lower legs"],
+  ];
+
   let CUR_LANG = "zh";
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -69,15 +119,38 @@
     $("#f-bp").addEventListener("change", runSearch);
     $("#f-eq").addEventListener("change", runSearch);
 
-    // 方案表单
+    // 周计划表单
     $("#gen-btn").addEventListener("click", onGenerate);
     $("#print-btn").addEventListener("click", () => window.print());
 
-    // Tab 切换
-    $$(".tab").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+    // 今日单次：语言下拉
+    const sLang = $("#s-lang");
+    LANGS.forEach((l) => { const o = document.createElement("option"); o.value = l; o.textContent = LANG_LABEL[l]; sLang.appendChild(o); });
+    sLang.value = "zh";
+
+    // 今日单次：重点部位 chips
+    const singleFocusBox = $("#single-focus-box");
+    FOCUS_GROUPS.forEach((g) => {
+      const id = "sfc_" + g.key;
+      const lab = document.createElement("label");
+      lab.className = "chip";
+      lab.innerHTML = `<input type="checkbox" id="${id}" value="${g.key}"><span>${g.label}</span>`;
+      singleFocusBox.appendChild(lab);
+    });
+
+    // 今日单次：生成 & 打印
+    $("#s-gen-btn").addEventListener("click", onGenerateSingle);
+    $("#s-print-btn").addEventListener("click", () => window.print());
+
+    // 主 Tab 切换（仅响应有 data-tab 属性的按钮）
+    $$(".tab[data-tab]").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+
+    // 方案子 Tab 切换
+    $$(".ptab[data-ptab]").forEach((t) => t.addEventListener("click", () => switchPlanTab(t.dataset.ptab)));
 
     // 恢复上次资料
     loadProfile();
+    loadSingleProfile();
     runSearch();
   }
 
@@ -312,9 +385,152 @@
   }
 
   function switchTab(tab) {
-    $$(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+    $$(".tab[data-tab]").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
     $("#sec-learn").style.display = tab === "learn" ? "" : "none";
     $("#sec-plan").style.display = tab === "plan" ? "" : "none";
+  }
+
+  function switchPlanTab(tab) {
+    $$(".ptab[data-ptab]").forEach((t) => t.classList.toggle("active", t.dataset.ptab === tab));
+    $("#ptab-weekly").style.display = tab === "weekly" ? "" : "none";
+    $("#ptab-single").style.display = tab === "single" ? "" : "none";
+    // 切换时收起上次输出
+    if (tab === "weekly") { $("#plan-output").classList.remove("show"); }
+    if (tab === "single") { $("#single-output").innerHTML = ""; }
+  }
+
+  /* ---------- 今日单次训练 ---------- */
+  function onGenerateSingle() {
+    const p = {
+      goal:        $("#s-goal").value,
+      equipment:   $("#s-equip").value,
+      duration:    parseInt($("#s-dur").value, 10),
+      energy:      $("#s-energy").value,
+      lang:        $("#s-lang").value,
+      focus:       $$("#single-focus-box input:checked").map((c) => c.value),
+      limitations: $("#s-limit").value || ""
+    };
+    saveSingleProfile(p);
+    const out = buildSingleSession(p);
+    $("#single-output").innerHTML = out;
+    $("#single-output").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function buildSingleSession(p) {
+    const equip = EQUIP_MAP[p.equipment];
+    // 未选部位时从推荐组合中随机取一个
+    const focus = p.focus.length
+      ? p.focus
+      : AUTO_FOCUS_COMBOS[Math.floor(Math.random() * AUTO_FOCUS_COMBOS.length)];
+
+    const sr = SETREP[p.goal] || SETREP.general;
+    const ec = ENERGY_CONFIG[p.energy] || ENERGY_CONFIG["正常"];
+    const maxEx = TIME_TO_EX[p.duration] || 6;
+
+    let pool = EXERCISES.filter((e) => {
+      if (equip && e.equipment !== equip) return false;
+      return focus.includes(ePart(e));
+    });
+
+    const risk = applyRisk(p.limitations, pool);
+    pool = risk.pool;
+
+    if (!pool.length) return `<p class="warn">没有匹配的动作，请放宽器械或重点部位条件。</p>`;
+
+    // 按有效部位分组，每个部位均匀取若干动作
+    const byFocusPart = {};
+    pool.forEach((e) => { const pt = ePart(e); (byFocusPart[pt] = byFocusPart[pt] || []).push(e); });
+    const actualFocus = focus.filter((f) => byFocusPart[f]);
+    const perPart = Math.max(2, Math.ceil(maxEx / Math.max(actualFocus.length, 1)));
+
+    let selected = [];
+    actualFocus.forEach((pt) => {
+      shuffle(byFocusPart[pt]).slice(0, perPart).forEach((e) => selected.push({ ex: e, part: pt }));
+    });
+    selected = selected.slice(0, maxEx);
+
+    return renderSingleSession(selected, p, ec, sr, risk.notes, actualFocus);
+  }
+
+  function renderSingleSession(exercises, p, ec, sr, riskNotes, focus) {
+    const lang = p.lang || "zh";
+    const goalTxt = GOAL_LABEL[p.goal] || p.goal;
+    const focusTxt = focus.map((k) => BP_LABEL[k] || k).join(" + ");
+    const autoTip = p.focus && p.focus.length === 0
+      ? `<div class="lhint" style="margin-bottom:8px">💡 未选重点部位，已为你自动推荐：<b>${focusTxt}</b></div>` : "";
+
+    // 热身（去重，最多 5 条）
+    const warmupItems = [...new Set(focus.flatMap((k) => WARMUP[k] || ["动态拉伸 5 分钟"]))].slice(0, 5);
+    const warmupHtml = warmupItems.map((s) => `<li>${esc(s)}</li>`).join("");
+
+    // 放松（去重，最多 5 条）
+    const cooldownItems = [...new Set(focus.flatMap((k) => COOLDOWN[k] || ["静态拉伸 5 分钟"]))].slice(0, 5);
+    const cooldownHtml = cooldownItems.map((s) => `<li>${esc(s)}</li>`).join("");
+
+    // 主训练动作
+    const exHtml = exercises.map((x) => {
+      const e = x.ex;
+      const ins = (e.instructions[lang] || e.instructions.en || "").slice(0, 100);
+      const hint = ins ? `<div class="lhint">${esc(ins)}…</div>` : "";
+      return `<li>
+        <b>${esc(e.name)}</b>
+        <span class="sr">${esc(sr.sets)} 组 × ${esc(sr.reps)} 次</span>
+        <button class="link" onclick="window.__search('${esc(e.name)}')">查看动作</button>
+        ${hint}
+      </li>`;
+    }).join("");
+
+    const riskHtml = riskNotes.length
+      ? `<div class="risk">⚠️ 已根据伤病限制调整：${riskNotes.map(esc).join(" ")}<br><span class="disclaim">本方案为通用参考，不替代医疗 / 教练建议。</span></div>`
+      : `<div class="risk disclaim">本方案为通用参考，请量力而行，如有不适立即停止。</div>`;
+    const energyHtml = ec.setsNote
+      ? `<div class="risk" style="background:rgba(76,201,240,.08);border-color:rgba(76,201,240,.3);color:var(--accent2)">${esc(ec.label)} ${esc(ec.setsNote)}</div>` : "";
+
+    const mainMin = Math.max(p.duration - 15, 10);
+
+    return `
+      <div class="plan-head">
+        <h2>今日训练方案</h2>
+        <div class="meta-row">
+          <span>目标:${esc(goalTxt)}</span>
+          <span>重点:${esc(focusTxt)}</span>
+          <span>时长:${esc(p.duration)} 分钟</span>
+          <span>状态:${esc(ec.label)}</span>
+        </div>
+        ${autoTip}
+        ${riskHtml}
+        ${energyHtml}
+      </div>
+      <div class="section-card">
+        <div class="day-h">🔥 热身（5–10 分钟）</div>
+        <ul class="ex-list">${warmupHtml}</ul>
+      </div>
+      <div class="section-card">
+        <div class="day-h">💪 主训练（约 ${mainMin} 分钟）</div>
+        <ul class="ex-list">${exHtml}</ul>
+        <div class="note">组间休息 ${esc(sr.rest)}。</div>
+      </div>
+      <div class="section-card">
+        <div class="day-h">🧘 放松拉伸（5 分钟）</div>
+        <ul class="ex-list">${cooldownHtml}</ul>
+      </div>`;
+  }
+
+  /* ---------- 今日单次 profile 持久化 ---------- */
+  function saveSingleProfile(p) {
+    try { localStorage.setItem("fit_single_profile", JSON.stringify(p)); } catch (e) {}
+  }
+  function loadSingleProfile() {
+    let p = null;
+    try { p = JSON.parse(localStorage.getItem("fit_single_profile") || "null"); } catch (e) {}
+    if (!p) return;
+    if (p.goal)      $("#s-goal").value = p.goal;
+    if (p.equipment) $("#s-equip").value = p.equipment;
+    if (p.duration)  $("#s-dur").value = p.duration;
+    if (p.energy)    $("#s-energy").value = p.energy;
+    if (p.lang)      $("#s-lang").value = p.lang;
+    if (p.limitations) $("#s-limit").value = p.limitations;
+    if (p.focus) p.focus.forEach((k) => { const el = document.getElementById("sfc_" + k); if (el) el.checked = true; });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
