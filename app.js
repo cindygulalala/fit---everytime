@@ -328,17 +328,21 @@
           <div class="day-body">轻度有氧 20 分钟 或 拉伸放松。</div></div>`;
       }
       const partsTxt = d.parts.map((pt) => BP_LABEL[pt] || pt).join(" + ");
-      const items = d.exercises.map((x) => {
+      const rows = d.exercises.map((x, i) => {
         const e = x.ex;
-        const hint = (lang && lang !== "en" && e.instructions[lang])
-          ? `<div class="lhint">${esc(e.instructions[lang].slice(0, 90))}</div>` : "";
-        return `<li><b>${esc(e.name)}</b>
-          <span class="sr">${sr.sets} 组 × ${sr.reps} 次</span>
-          <button class="link" onclick="window.__search('${esc(e.name)}')">查看动作</button>
-          ${hint}</li>`;
+        return `<tr>
+          <td class="ex-num">${i + 1}</td>
+          <td class="ex-name">${esc(e.name)}</td>
+          <td class="ex-vol">${sr.sets} × ${sr.reps}</td>
+          <td class="ex-act"><button class="link" onclick="window.__search('${esc(e.name)}')">查看</button></td>
+        </tr>`;
       }).join("");
+      const table = `<table class="plan-table">
+        <thead><tr><th>#</th><th>动作</th><th>组 × 次</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
       return `<div class="day"><div class="day-h">第 ${d.day} 天 · ${esc(partsTxt)}</div>
-        <div class="day-body"><ul class="ex-list">${items}</ul>
+        <div class="day-body">${table}
         <div class="note">组间休息 ${esc(sr.rest)}。</div></div></div>`;
     }).join("");
 
@@ -467,18 +471,20 @@
     const cooldownItems = [...new Set(focus.flatMap((k) => COOLDOWN[k] || ["静态拉伸 5 分钟"]))].slice(0, 5);
     const cooldownHtml = cooldownItems.map((s) => `<li>${esc(s)}</li>`).join("");
 
-    // 主训练动作
-    const exHtml = exercises.map((x) => {
+    // 主训练动作（表格，只展示名称 + 组次 + 链接）
+    const exRows = exercises.map((x, i) => {
       const e = x.ex;
-      const ins = (e.instructions[lang] || e.instructions.en || "").slice(0, 100);
-      const hint = ins ? `<div class="lhint">${esc(ins)}…</div>` : "";
-      return `<li>
-        <b>${esc(e.name)}</b>
-        <span class="sr">${esc(sr.sets)} 组 × ${esc(sr.reps)} 次</span>
-        <button class="link" onclick="window.__search('${esc(e.name)}')">查看动作</button>
-        ${hint}
-      </li>`;
+      return `<tr>
+        <td class="ex-num">${i + 1}</td>
+        <td class="ex-name">${esc(e.name)}</td>
+        <td class="ex-vol">${esc(sr.sets)} × ${esc(sr.reps)}</td>
+        <td class="ex-act"><button class="link" onclick="window.__search('${esc(e.name)}')">查看</button></td>
+      </tr>`;
     }).join("");
+    const exHtml = `<table class="plan-table">
+      <thead><tr><th>#</th><th>动作</th><th>组 × 次</th><th></th></tr></thead>
+      <tbody>${exRows}</tbody>
+    </table>`;
 
     const riskHtml = riskNotes.length
       ? `<div class="risk">⚠️ 已根据伤病限制调整：${riskNotes.map(esc).join(" ")}<br><span class="disclaim">本方案为通用参考，不替代医疗 / 教练建议。</span></div>`
