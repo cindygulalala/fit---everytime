@@ -80,6 +80,111 @@
     ["glutes", "lower legs"],
   ];
 
+  /* ============================================================
+     训练逻辑规格实现（training_plan_logic_1.md）
+  ============================================================ */
+
+  // 肌群定义（含目标优先权，数字越大越优先）
+  const MUSCLE_GROUPS = [
+    { key: "chest",     label: "胸",     zone: "upper", prio: { hypertrophy:3, strength:3, fatloss:2, tone:2, rehab:1, general:2 } },
+    { key: "back",      label: "背",     zone: "upper", prio: { hypertrophy:3, strength:3, fatloss:2, tone:2, rehab:1, general:2 } },
+    { key: "shoulder",  label: "肩",     zone: "upper", prio: { hypertrophy:2, strength:2, fatloss:2, tone:3, rehab:1, general:2 } },
+    { key: "bicep",     label: "二头",   zone: "upper", prio: { hypertrophy:2, strength:1, fatloss:1, tone:2, rehab:1, general:1 } },
+    { key: "tricep",    label: "三头",   zone: "upper", prio: { hypertrophy:2, strength:1, fatloss:1, tone:2, rehab:1, general:1 } },
+    { key: "quad",      label: "股四头", zone: "lower", prio: { hypertrophy:3, strength:3, fatloss:3, tone:3, rehab:2, general:3 } },
+    { key: "hamstring", label: "腘绳肌", zone: "lower", prio: { hypertrophy:2, strength:2, fatloss:2, tone:2, rehab:2, general:2 } },
+    { key: "glute",     label: "臀",     zone: "lower", prio: { hypertrophy:3, strength:2, fatloss:3, tone:3, rehab:2, general:3 } },
+    { key: "calf",      label: "小腿",   zone: "lower", prio: { hypertrophy:1, strength:1, fatloss:2, tone:2, rehab:1, general:1 } },
+    { key: "core",      label: "核心",   zone: "core",  prio: { hypertrophy:1, strength:2, fatloss:3, tone:3, rehab:3, general:2 } },
+  ];
+
+  // 将肌群 key 映射回 WARMUP / COOLDOWN 所用的 body_part key
+  const MUSCLE_TO_BP = {
+    chest: "chest", back: "back", shoulder: "shoulders",
+    bicep: "upper arms", tricep: "upper arms",
+    quad: "upper legs", hamstring: "upper legs", glute: "glutes",
+    calf: "lower legs", core: "waist"
+  };
+
+  // 按肌群 key 过滤动作（使用已有 ePart() 函数）
+  const MUSCLE_EX_FILTER = {
+    chest:     (e) => ePart(e) === "chest",
+    back:      (e) => ePart(e) === "back",
+    shoulder:  (e) => ePart(e) === "shoulders",
+    bicep:     (e) => ePart(e) === "upper arms" && !(e.target || "").toLowerCase().includes("tricep"),
+    tricep:    (e) => ePart(e) === "upper arms" && (e.target || "").toLowerCase().includes("tricep"),
+    quad:      (e) => ePart(e) === "upper legs" && !(e.target || "").toLowerCase().includes("hamstring"),
+    hamstring: (e) => ePart(e) === "upper legs" && (e.target || "").toLowerCase().includes("hamstring"),
+    glute:     (e) => ePart(e) === "glutes",
+    calf:      (e) => ePart(e) === "lower legs",
+    core:      (e) => ePart(e) === "waist",
+  };
+
+  // 训练分化模板
+  const SPLIT_TEMPLATES = {
+    full_body: {
+      label: "Full Body 全身训练",
+      focuses: ["全身（上肢 + 下肢 + 核心）", "全身（上肢 + 下肢 + 核心）", "全身（上肢 + 下肢 + 核心）"],
+      muscles: [
+        ["chest", "back", "shoulder", "quad", "glute", "core"],
+        ["chest", "back", "shoulder", "quad", "hamstring", "core"],
+        ["chest", "back", "shoulder", "glute", "hamstring", "core"],
+      ],
+    },
+    upper_lower: {
+      label: "上下肢分化（Upper / Lower）",
+      focuses: ["上肢（胸/背/肩/手臂）", "下肢（腿/臀/核心）", "上肢（胸/背/肩/手臂）", "下肢（腿/臀/核心）"],
+      muscles: [
+        ["chest", "back", "shoulder", "bicep", "tricep"],
+        ["quad", "hamstring", "glute", "calf", "core"],
+        ["chest", "back", "shoulder", "bicep", "tricep"],
+        ["quad", "hamstring", "glute", "calf", "core"],
+      ],
+    },
+    ppl: {
+      label: "PPL（推 / 拉 / 腿）",
+      focuses: ["推（胸/肩/三头）", "拉（背/二头）", "腿（股四头/腘绳/臀）", "推（胸/肩/三头）", "拉（背/二头）"],
+      muscles: [
+        ["chest", "shoulder", "tricep"],
+        ["back", "bicep"],
+        ["quad", "hamstring", "glute", "calf"],
+        ["chest", "shoulder", "tricep"],
+        ["back", "bicep"],
+      ],
+    },
+  };
+
+  // 按水平 + 目标 + 天数选择分化类型（规格 2.2 Step 1）
+  function selectSplit(level, goal, days) {
+    const isBeginner = ["新手", "初级"].includes(level);
+    const isAdvanced = level === "高级";
+    const isBuildGoal = ["hypertrophy", "strength"].includes(goal);
+
+    if (isBeginner || days <= 2) {
+      const d = Math.min(days, 3);
+      const reason = isBeginner
+        ? "新手阶段推荐全身训练（Full Body），每周 2-3 次，有效建立动作模式与基础力量，各肌群均可均衡发展。"
+        : "每周训练天数较少，全身训练效率最高，每次覆盖所有主要肌群。";
+      return { type: "full_body", days: d, reason };
+    }
+    if (days === 3) {
+      return {
+        type: "full_body", days: 3,
+        reason: "每周 3 天全身训练兼顾恢复与训练频率，是大多数目标的高效选择。"
+      };
+    }
+    if (isAdvanced || (isBuildGoal && days >= 4)) {
+      return {
+        type: "ppl", days: Math.min(days, 5),
+        reason: "PPL 分化训练让每个肌群每周获得 2 次训练刺激，同时保证充足恢复时间，适合增肌与力量目标。"
+      };
+    }
+    return {
+      type: "upper_lower", days: Math.min(days, 4),
+      reason: "上下肢分化兼顾训练频次与恢复效率，每次训练量适中，适合中级水平的减脂或综合训练目标。"
+    };
+  }
+
   let CUR_LANG = "zh";
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -104,16 +209,6 @@
     fillSelect($("#f-bp"), bps, (v) => BP_LABEL[v] || v);
     fillSelect($("#f-eq"), eqs, (v) => EQUIP_LABEL[v] || v);
 
-    // 重点部位 chips
-    const focusBox = $("#focus-box");
-    FOCUS_GROUPS.forEach((g) => {
-      const id = "fc_" + g.key;
-      const lab = document.createElement("label");
-      lab.className = "chip";
-      lab.innerHTML = `<input type="checkbox" id="${id}" value="${g.key}"><span>${g.label}</span>`;
-      focusBox.appendChild(lab);
-    });
-
     $("#search-btn").addEventListener("click", runSearch);
     $("#search-input").addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
     $("#f-bp").addEventListener("change", runSearch);
@@ -128,14 +223,13 @@
     LANGS.forEach((l) => { const o = document.createElement("option"); o.value = l; o.textContent = LANG_LABEL[l]; sLang.appendChild(o); });
     sLang.value = "zh";
 
-    // 今日单次：重点部位 chips
-    const singleFocusBox = $("#single-focus-box");
-    FOCUS_GROUPS.forEach((g) => {
-      const id = "sfc_" + g.key;
+    // 今日单次：肌群恢复状态 grid（每个肌群一个 chip，勾 = 仍在恢复中）
+    const recoveryGrid = $("#muscle-recovery-grid");
+    MUSCLE_GROUPS.forEach((mg) => {
       const lab = document.createElement("label");
       lab.className = "chip";
-      lab.innerHTML = `<input type="checkbox" id="${id}" value="${g.key}"><span>${g.label}</span>`;
-      singleFocusBox.appendChild(lab);
+      lab.innerHTML = `<input type="checkbox" value="${mg.key}"><span>${mg.label}</span>`;
+      recoveryGrid.appendChild(lab);
     });
 
     // 今日单次：生成 & 打印
@@ -232,14 +326,14 @@
   /* ---------- 训练方案生成 ---------- */
   function onGenerate() {
     const p = {
-      goal: $("#p-goal").value,
-      level: $("#p-level").value,
-      equipment: $("#p-equip").value,
-      days: parseInt($("#p-days").value, 10),
-      duration: parseInt($("#p-dur").value, 10),
-      focus: $$("#focus-box input:checked").map((c) => c.value),
+      goal:        $("#p-goal").value,
+      level:       $("#p-level").value,
+      equipment:   $("#p-equip").value,
+      days:        parseInt($("#p-days").value, 10),
+      duration:    parseInt($("#p-dur").value, 10),
+      weeks:       parseInt($("#p-weeks").value, 10) || 4,
       limitations: $("#p-limit").value || "",
-      lang: $("#p-lang").value
+      lang:        $("#p-lang").value
     };
     saveProfile(p);
     const out = buildPlan(p);
@@ -251,13 +345,18 @@
   function applyRisk(text, pool) {
     const notes = [];
     const t = (text || "").toLowerCase();
+    // 安全红线：心脏/心血管相关（规格 §5）
+    if (/心脏|心血管|高血压|cardiac|heart/i.test(t)) {
+      pool = pool.filter((e) => !/deadlift|clean|snatch|press|squat|sprint|hiit|burpee|jump/i.test(e.name));
+      notes.push("⚠️ 已识别心脏/心血管风险禁忌，已过滤高强度大重量动作。请在专科医生评估后再开始运动计划。");
+    }
     if (/腰|腰椎|间盘|脊椎|disk|back pain|herni/i.test(t)) {
       pool = pool.filter((e) => e.body_part !== "waist" && !/deadlift|good morning|back extension|hyper|sit-up|crunch/i.test(e.name));
-      notes.push("已避开高脊柱负荷动作（如硬拉、仰卧起坐）；腰背不适者请量力而行并咨询专业人士。");
+      notes.push("已避开高脊柱负荷动作（如硬拉、仰卧起坐）；腰背不适请量力而行并咨询专业人士。");
     }
     if (/膝|knee/i.test(t)) {
       pool = pool.filter((e) => !/jump|box|plyo|lunge|squat|leg press|sprint|burpee/i.test(e.name));
-      notes.push("已避开膝部高冲击/深蹲类动作（如跳跃、箭步蹲、深蹲）；膝不适者注意控制幅度。");
+      notes.push("已避开膝部高冲击/深蹲类动作（如跳跃、箭步蹲）；膝不适者注意控制幅度。");
     }
     if (/肩|shoulder/i.test(t)) {
       pool = pool.filter((e) => !/overhead|press|upright row|lateral raise|fly/i.test(e.name));
@@ -271,93 +370,120 @@
     return (e.target || "").toLowerCase().includes("glute") ? "glutes" : e.body_part;
   }
 
+  // 长期计划生成（规格逻辑一）
   function buildPlan(p) {
-    const lang = p.lang;
     const equip = EQUIP_MAP[p.equipment];
-    const focus = p.focus.length ? p.focus : FOCUS_GROUPS.map((g) => g.key).filter((k) => k !== "neck");
-    let pool = EXERCISES.filter((e) => {
-      if (equip && e.equipment !== equip) return false;
-      if (!focus.includes(ePart(e))) return false;
-      return true;
-    });
+    const weeks = p.weeks || 4;
+    let days = parseInt(p.days);
+
+    // 安全红线：无休息日（规格 §5）
+    const safetyWarnings = [];
+    if (days >= 7) {
+      safetyWarnings.push("每周训练 7 天无休息日存在过度训练风险，已强制减至 5 天，建议保留至少 2 个休息日。");
+      days = 5;
+    }
+
+    // Step 1：选择训练分化类型
+    const split = selectSplit(p.level, p.goal, days);
+    const template = SPLIT_TEMPLATES[split.type];
+    const trainDays = split.days;
+
+    // 构建可用动作池（器械过滤 + 伤病风险过滤）
+    let pool = EXERCISES.filter((e) => !equip || e.equipment === equip);
     const risk = applyRisk(p.limitations, pool);
     pool = risk.pool;
-    if (!pool.length) return `<p class="warn">没有匹配的动作，请放宽器械或重点部位条件。</p>`;
+    safetyWarnings.push(...risk.notes);
 
-    const byPart = {};
-    pool.forEach((e) => { const pt = ePart(e); (byPart[pt] = byPart[pt] || []).push(e); });
-    const parts = Object.keys(byPart);
+    if (!pool.length) return `<p class="warn">没有匹配的动作，请放宽器械条件。</p>`;
 
-    const perPart = { "新手": 3, "初级": 3, "中级": 4, "高级": 4 }[p.level] || 3;
     const sr = SETREP[p.goal] || SETREP.general;
-    const maxEx = { 30: 5, 45: 7, 60: 9 }[p.duration] || 6;
+    const maxEx = TIME_TO_EX[p.duration] || 6;
 
-    // 把部位尽量均分到各训练日 (round-robin), 同部位不重复出现
-    const groups = Array.from({ length: p.days }, () => []);
-    parts.forEach((pt, i) => groups[i % p.days].push(pt));
-
-    const plan = groups.map((gparts, i) => {
+    // Step 4：按天填充动作（规格 2.2 Step 4）
+    const sessions = template.muscles.slice(0, trainDays).map((muscles, i) => {
+      const exPerMuscle = Math.max(1, Math.ceil(maxEx / muscles.length));
       let exs = [];
-      gparts.forEach((pt) => {
-        shuffle(byPart[pt]).slice(0, perPart).forEach((e) => exs.push({ ex: e, part: pt }));
+      muscles.forEach((mkey) => {
+        const fn = MUSCLE_EX_FILTER[mkey];
+        if (!fn) return;
+        const mPool = pool.filter(fn);
+        if (!mPool.length) return;
+        shuffle(mPool).slice(0, exPerMuscle).forEach((e) => exs.push(e));
       });
-      // 控制单日动作数
-      if (exs.length > maxEx) exs = exs.slice(0, maxEx);
-      return { day: i + 1, parts: gparts, exercises: exs, rest: gparts.length === 0 };
+      return { focus: template.focuses[i] || "训练", exercises: exs.slice(0, maxEx) };
     });
 
-    return renderPlan(plan, p, sr, risk.notes, parts.length);
+    return renderPlan(sessions, p, sr, split, template, weeks, safetyWarnings);
   }
 
-  function renderPlan(plan, p, sr, riskNotes, partCount) {
-    const lang = p.lang;
+  function renderPlan(sessions, p, sr, split, template, weeks, warnings) {
     const goalTxt = GOAL_LABEL[p.goal] || p.goal;
-    const levelTxt = p.level;
-    const equipTxt = p.equipment;
-    const durTxt = p.duration + " 分钟";
-    const focusTxt = (p.focus.length ? p.focus : FOCUS_GROUPS.map((g) => g.key).filter((k) => k !== "neck"))
-      .map((k) => BP_LABEL[k] || k).join("、");
 
-    let riskHtml = riskNotes.length
-      ? `<div class="risk">⚠️ 已根据你的限制调整：${riskNotes.map(esc).join(" ")}<br><span class="disclaim">本方案为通用参考，不能替代专业医疗/教练建议。</span></div>`
+    const warnHtml = warnings.length
+      ? `<div class="risk">⚠️ ${warnings.map(esc).join(" ")}<br><span class="disclaim">本方案为通用参考，请遵医嘱 / 专业教练。</span></div>`
       : `<div class="risk disclaim">本方案为通用参考，伤病或特殊情况请遵医嘱 / 专业教练。</div>`;
 
-    let daysHtml = plan.map((d) => {
-      if (d.rest) {
-        return `<div class="day"><div class="day-h">第 ${d.day} 天 · 休息 / 主动恢复</div>
-          <div class="day-body">轻度有氧 20 分钟 或 拉伸放松。</div></div>`;
-      }
-      const partsTxt = d.parts.map((pt) => BP_LABEL[pt] || pt).join(" + ");
-      const rows = d.exercises.map((x, i) => {
-        const e = x.ex;
-        return `<tr>
-          <td class="ex-num">${i + 1}</td>
+    // Step 3：进阶逻辑说明（规格 2.2 Step 3）
+    const deloadHtml = weeks >= 4
+      ? `<li>📉 <b>第 4 周（减量周）</b>：组数降至正常的 60%，重量减轻，专注动作质量和充分恢复。</li>` : "";
+    const cycleHtml = weeks > 4
+      ? `<li>🔄 第 5 周起以更高基础重量重复上述节奏，每个 4 周循环逐渐进阶。</li>` : "";
+
+    const progressHtml = `
+      <div class="section-card" style="margin-bottom:14px">
+        <div class="day-h">📈 ${weeks} 周渐进安排</div>
+        <ul class="ex-list">
+          <li>🟢 <b>第 1 周</b>：基础负荷，RPE 目标 6-7，熟悉动作节奏与感受。</li>
+          <li>🔼 <b>第 2-3 周</b>：每周递增——每个动作增加 1 组，或重量增加 2.5-5%。</li>
+          ${deloadHtml}${cycleHtml}
+        </ul>
+      </div>`;
+
+    const daysHtml = sessions.map((s, i) => {
+      const rows = s.exercises.map((e, j) => `
+        <tr>
+          <td class="ex-num">${j + 1}</td>
           <td class="ex-name">${esc(e.name)}</td>
           <td class="ex-vol">${sr.sets} × ${sr.reps}</td>
           <td class="ex-act"><button class="link" onclick="window.__search('${esc(e.name)}')">查看</button></td>
-        </tr>`;
-      }).join("");
-      const table = `<table class="plan-table">
-        <thead><tr><th>#</th><th>动作</th><th>组 × 次</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-      return `<div class="day"><div class="day-h">第 ${d.day} 天 · ${esc(partsTxt)}</div>
-        <div class="day-body">${table}
-        <div class="note">组间休息 ${esc(sr.rest)}。</div></div></div>`;
+        </tr>`).join("");
+      return `<div class="day">
+        <div class="day-h">第 ${i + 1} 天 · ${esc(s.focus)}</div>
+        <div class="day-body">
+          <table class="plan-table">
+            <thead><tr><th>#</th><th>动作</th><th>组 × 次</th><th></th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="note">组间休息 ${esc(sr.rest)}。</div>
+        </div>
+      </div>`;
     }).join("");
+
+    // 补充休息日
+    let restHtml = "";
+    for (let d = sessions.length + 1; d <= Math.min(parseInt(p.days), 7); d++) {
+      restHtml += `<div class="day">
+        <div class="day-h">第 ${d} 天 · 休息 / 主动恢复</div>
+        <div class="day-body">轻度有氧 20 分钟或全身拉伸放松。</div>
+      </div>`;
+    }
 
     return `
       <div class="plan-head">
         <h2>你的训练方案</h2>
         <div class="meta-row">
-          <span>目标:${esc(goalTxt)}</span><span>水平:${esc(levelTxt)}</span>
-          <span>器械:${esc(equipTxt)}</span><span>频率:${esc(p.days)} 天/周</span>
-          <span>单次:${esc(durTxt)}</span><span>重点:${esc(focusTxt)}</span>
+          <span>目标:${esc(goalTxt)}</span><span>水平:${esc(p.level)}</span>
+          <span>模式:${esc(template.label)}</span><span>频率:${sessions.length} 天/周</span>
+          <span>单次:${esc(p.duration)} 分钟</span><span>周期:${weeks} 周</span>
+        </div>
+        <div class="routine" style="margin-top:6px">
+          📋 <b>${esc(template.label)}</b> · ${esc(split.reason)}
         </div>
         <div class="routine">每次训练前动态热身 5-10 分钟；训练后拉伸 5-10 分钟。</div>
-        ${riskHtml}
+        ${warnHtml}
       </div>
-      <div class="days">${daysHtml}</div>`;
+      ${progressHtml}
+      <div class="days">${daysHtml}${restHtml}</div>`;
   }
 
   function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -378,14 +504,14 @@
     let p = null;
     try { p = JSON.parse(localStorage.getItem("fit_profile") || "null"); } catch (e) {}
     if (!p) return;
-    if (p.goal) $("#p-goal").value = p.goal;
-    if (p.level) $("#p-level").value = p.level;
-    if (p.equipment) $("#p-equip").value = p.equipment;
-    if (p.days) $("#p-days").value = p.days;
-    if (p.duration) $("#p-dur").value = p.duration;
-    if (p.lang) $("#p-lang").value = p.lang;
+    if (p.goal)        $("#p-goal").value = p.goal;
+    if (p.level)       $("#p-level").value = p.level;
+    if (p.equipment)   $("#p-equip").value = p.equipment;
+    if (p.days)        $("#p-days").value = p.days;
+    if (p.duration)    $("#p-dur").value = p.duration;
+    if (p.weeks)       { const el = $("#p-weeks"); if (el) el.value = p.weeks; }
+    if (p.lang)        $("#p-lang").value = p.lang;
     if (p.limitations) $("#p-limit").value = p.limitations;
-    if (p.focus) p.focus.forEach((k) => { const el = document.getElementById("fc_" + k); if (el) el.checked = true; });
   }
 
   function switchTab(tab) {
@@ -403,7 +529,7 @@
     if (tab === "single") { $("#single-output").innerHTML = ""; }
   }
 
-  /* ---------- 今日单次训练 ---------- */
+  /* ---------- 今日单次训练（规格逻辑二） ---------- */
   function onGenerateSingle() {
     const p = {
       goal:        $("#s-goal").value,
@@ -411,7 +537,7 @@
       duration:    parseInt($("#s-dur").value, 10),
       energy:      $("#s-energy").value,
       lang:        $("#s-lang").value,
-      focus:       $$("#single-focus-box input:checked").map((c) => c.value),
+      recovering:  $$("#muscle-recovery-grid input:checked").map((c) => c.value),
       limitations: $("#s-limit").value || ""
     };
     saveSingleProfile(p);
@@ -420,77 +546,108 @@
     $("#single-output").scrollIntoView({ behavior: "smooth" });
   }
 
+  // 单次训练生成（规格 3.2）
   function buildSingleSession(p) {
-    const equip = EQUIP_MAP[p.equipment];
-    // 未选部位时从推荐组合中随机取一个
-    const focus = p.focus.length
-      ? p.focus
-      : AUTO_FOCUS_COMBOS[Math.floor(Math.random() * AUTO_FOCUS_COMBOS.length)];
+    // Step 1-2：解析恢复状态，过滤未恢复肌群
+    const recovering = new Set(p.recovering || []);
+    const freshMuscles = MUSCLE_GROUPS.filter((mg) => !recovering.has(mg.key));
 
-    const sr = SETREP[p.goal] || SETREP.general;
+    // 特殊情况：所有肌群均未恢复 → 主动恢复方案
+    if (freshMuscles.length === 0) return renderActiveRecovery();
+
+    const equip = EQUIP_MAP[p.equipment];
     const ec = ENERGY_CONFIG[p.energy] || ENERGY_CONFIG["正常"];
     const maxEx = TIME_TO_EX[p.duration] || 6;
 
-    let pool = EXERCISES.filter((e) => {
-      if (equip && e.equipment !== equip) return false;
-      return focus.includes(ePart(e));
-    });
+    // Step 3：按目标优先级排序已恢复肌群，结合疲劳调整强度
+    let sr = { ...(SETREP[p.goal] || SETREP.general) };
+    let intensityNote = "";
+    if (p.energy === "有限") {
+      sr.sets = "2-3";
+      intensityNote = "今日体力有限，已降低训练量，建议以轻重量、慢节奏为主。";
+    } else if (p.energy === "充沛") {
+      intensityNote = "今日状态充沛，可在标准基础上适当加重或多做 1 组。";
+    }
 
+    // 按目标优先权排序（恢复最充分 + 目标最相关）
+    const sorted = [...freshMuscles].sort(
+      (a, b) => (b.prio[p.goal] || 2) - (a.prio[p.goal] || 2)
+    );
+
+    // 根据时长决定训练几个肌群（时间短则专注单一肌群）
+    const muscleCount = maxEx <= 4 ? 1 : maxEx <= 6 ? 2 : 3;
+    const selected = sorted.slice(0, muscleCount);
+
+    // 生成推荐理由（规格 3.3 reason 字段）
+    const freshNames = freshMuscles.map((mg) => mg.label).join("、");
+    const selectedNames = selected.map((mg) => mg.label).join(" + ");
+    const goalTxt = GOAL_LABEL[p.goal] || p.goal;
+    const reason = `已恢复肌群：${freshNames}。结合 <b>${goalTxt}</b> 目标，今日优先安排 <b>${selectedNames}</b> 训练。`;
+
+    // Step 4：从动作库填充
+    let pool = EXERCISES.filter((e) => !equip || e.equipment === equip);
     const risk = applyRisk(p.limitations, pool);
     pool = risk.pool;
 
-    if (!pool.length) return `<p class="warn">没有匹配的动作，请放宽器械或重点部位条件。</p>`;
-
-    // 按有效部位分组，每个部位均匀取若干动作
-    const byFocusPart = {};
-    pool.forEach((e) => { const pt = ePart(e); (byFocusPart[pt] = byFocusPart[pt] || []).push(e); });
-    const actualFocus = focus.filter((f) => byFocusPart[f]);
-    const perPart = Math.max(2, Math.ceil(maxEx / Math.max(actualFocus.length, 1)));
-
-    let selected = [];
-    actualFocus.forEach((pt) => {
-      shuffle(byFocusPart[pt]).slice(0, perPart).forEach((e) => selected.push({ ex: e, part: pt }));
+    const exPerMuscle = Math.max(1, Math.ceil(maxEx / selected.length));
+    let exercises = [];
+    selected.forEach((mg) => {
+      const fn = MUSCLE_EX_FILTER[mg.key];
+      if (!fn) return;
+      const mPool = pool.filter(fn);
+      if (!mPool.length) return;
+      shuffle(mPool).slice(0, exPerMuscle).forEach((e) => exercises.push({ ex: e, muscle: mg.key }));
     });
-    selected = selected.slice(0, maxEx);
+    exercises = exercises.slice(0, maxEx);
 
-    return renderSingleSession(selected, p, ec, sr, risk.notes, actualFocus);
+    if (!exercises.length) return `<p class="warn">没有匹配的动作，请放宽器械条件。</p>`;
+
+    return renderSingleSession(exercises, p, ec, sr, risk.notes, selected, reason, intensityNote);
   }
 
-  function renderSingleSession(exercises, p, ec, sr, riskNotes, focus) {
-    const lang = p.lang || "zh";
+  function renderActiveRecovery() {
+    return `
+      <div class="plan-head">
+        <h2>今日建议：主动恢复</h2>
+        <div class="meta-row"><span>所有肌群仍在恢复中（&lt;48h）</span></div>
+        <div class="risk" style="background:rgba(61,220,151,.08);border-color:rgba(61,220,151,.3);color:var(--ok)">
+          💤 所有肌群距上次训练不足 48 小时，今日适合休息或进行低强度主动恢复。
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="day-h">🧘 主动恢复方案（20-30 分钟）</div>
+        <ul class="ex-list">
+          <li>轻度有氧：慢跑、快走或骑行，心率维持最大心率的 50-60%</li>
+          <li>全身动态拉伸：关节绕环、猫牛式、髋部松动</li>
+          <li>泡沫轴滚压：大腿前侧、背部、小腿，各 1-2 分钟</li>
+        </ul>
+      </div>`;
+  }
+
+  function renderSingleSession(exercises, p, ec, sr, riskNotes, selectedMuscles, reason, intensityNote) {
+    const focusTxt = selectedMuscles.map((mg) => mg.label).join(" + ");
     const goalTxt = GOAL_LABEL[p.goal] || p.goal;
-    const focusTxt = focus.map((k) => BP_LABEL[k] || k).join(" + ");
-    const autoTip = p.focus && p.focus.length === 0
-      ? `<div class="lhint" style="margin-bottom:8px">💡 未选重点部位，已为你自动推荐：<b>${focusTxt}</b></div>` : "";
 
-    // 热身（去重，最多 5 条）
-    const warmupItems = [...new Set(focus.flatMap((k) => WARMUP[k] || ["动态拉伸 5 分钟"]))].slice(0, 5);
-    const warmupHtml = warmupItems.map((s) => `<li>${esc(s)}</li>`).join("");
-
-    // 放松（去重，最多 5 条）
-    const cooldownItems = [...new Set(focus.flatMap((k) => COOLDOWN[k] || ["静态拉伸 5 分钟"]))].slice(0, 5);
-    const cooldownHtml = cooldownItems.map((s) => `<li>${esc(s)}</li>`).join("");
-
-    // 主训练动作（表格，只展示名称 + 组次 + 链接）
-    const exRows = exercises.map((x, i) => {
-      const e = x.ex;
-      return `<tr>
-        <td class="ex-num">${i + 1}</td>
-        <td class="ex-name">${esc(e.name)}</td>
-        <td class="ex-vol">${esc(sr.sets)} × ${esc(sr.reps)}</td>
-        <td class="ex-act"><button class="link" onclick="window.__search('${esc(e.name)}')">查看</button></td>
-      </tr>`;
-    }).join("");
-    const exHtml = `<table class="plan-table">
-      <thead><tr><th>#</th><th>动作</th><th>组 × 次</th><th></th></tr></thead>
-      <tbody>${exRows}</tbody>
-    </table>`;
+    // 热身 / 放松：通过 muscle key → body_part key → WARMUP/COOLDOWN
+    const bpKeys = [...new Set(selectedMuscles.map((mg) => MUSCLE_TO_BP[mg.key] || mg.key))];
+    const warmupItems = [...new Set(bpKeys.flatMap((k) => WARMUP[k] || ["动态拉伸 5 分钟"]))].slice(0, 5);
+    const cooldownItems = [...new Set(bpKeys.flatMap((k) => COOLDOWN[k] || ["静态拉伸 5 分钟"]))].slice(0, 5);
 
     const riskHtml = riskNotes.length
-      ? `<div class="risk">⚠️ 已根据伤病限制调整：${riskNotes.map(esc).join(" ")}<br><span class="disclaim">本方案为通用参考，不替代医疗 / 教练建议。</span></div>`
+      ? `<div class="risk">⚠️ ${riskNotes.map(esc).join(" ")}<br><span class="disclaim">本方案为通用参考，不替代医疗 / 教练建议。</span></div>`
       : `<div class="risk disclaim">本方案为通用参考，请量力而行，如有不适立即停止。</div>`;
-    const energyHtml = ec.setsNote
-      ? `<div class="risk" style="background:rgba(76,201,240,.08);border-color:rgba(76,201,240,.3);color:var(--accent2)">${esc(ec.label)} ${esc(ec.setsNote)}</div>` : "";
+
+    const energyHtml = intensityNote
+      ? `<div class="risk" style="background:rgba(76,201,240,.08);border-color:rgba(76,201,240,.3);color:var(--accent2)">${esc(ec.label)} · ${esc(intensityNote)}</div>`
+      : "";
+
+    const exRows = exercises.map((x, i) => `
+      <tr>
+        <td class="ex-num">${i + 1}</td>
+        <td class="ex-name">${esc(x.ex.name)}</td>
+        <td class="ex-vol">${esc(sr.sets)} × ${esc(sr.reps)}</td>
+        <td class="ex-act"><button class="link" onclick="window.__search('${esc(x.ex.name)}')">查看</button></td>
+      </tr>`).join("");
 
     const mainMin = Math.max(p.duration - 15, 10);
 
@@ -503,40 +660,54 @@
           <span>时长:${esc(p.duration)} 分钟</span>
           <span>状态:${esc(ec.label)}</span>
         </div>
-        ${autoTip}
+        <div class="routine" style="margin-top:6px;color:var(--accent2)">💡 ${reason}</div>
         ${riskHtml}
         ${energyHtml}
       </div>
       <div class="section-card">
-        <div class="day-h">🔥 热身（5–10 分钟）</div>
-        <ul class="ex-list">${warmupHtml}</ul>
+        <div class="day-h">🔥 热身（5-10 分钟）</div>
+        <ul class="ex-list">${warmupItems.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
       </div>
       <div class="section-card">
         <div class="day-h">💪 主训练（约 ${mainMin} 分钟）</div>
-        <ul class="ex-list">${exHtml}</ul>
+        <table class="plan-table">
+          <thead><tr><th>#</th><th>动作</th><th>组 × 次</th><th></th></tr></thead>
+          <tbody>${exRows}</tbody>
+        </table>
         <div class="note">组间休息 ${esc(sr.rest)}。</div>
       </div>
       <div class="section-card">
         <div class="day-h">🧘 放松拉伸（5 分钟）</div>
-        <ul class="ex-list">${cooldownHtml}</ul>
+        <ul class="ex-list">${cooldownItems.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>
       </div>`;
   }
 
   /* ---------- 今日单次 profile 持久化 ---------- */
   function saveSingleProfile(p) {
-    try { localStorage.setItem("fit_single_profile", JSON.stringify(p)); } catch (e) {}
+    try {
+      localStorage.setItem("fit_single_profile", JSON.stringify(p));
+      // 恢复状态仅当天有效（第二天自动清除）
+      localStorage.setItem("fit_recovery_date", new Date().toDateString());
+    } catch (e) {}
   }
   function loadSingleProfile() {
     let p = null;
     try { p = JSON.parse(localStorage.getItem("fit_single_profile") || "null"); } catch (e) {}
     if (!p) return;
-    if (p.goal)      $("#s-goal").value = p.goal;
-    if (p.equipment) $("#s-equip").value = p.equipment;
-    if (p.duration)  $("#s-dur").value = p.duration;
-    if (p.energy)    $("#s-energy").value = p.energy;
-    if (p.lang)      $("#s-lang").value = p.lang;
+    if (p.goal)        $("#s-goal").value = p.goal;
+    if (p.equipment)   $("#s-equip").value = p.equipment;
+    if (p.duration)    $("#s-dur").value = p.duration;
+    if (p.energy)      $("#s-energy").value = p.energy;
+    if (p.lang)        $("#s-lang").value = p.lang;
     if (p.limitations) $("#s-limit").value = p.limitations;
-    if (p.focus) p.focus.forEach((k) => { const el = document.getElementById("sfc_" + k); if (el) el.checked = true; });
+    // 恢复状态：仅当保存于今天时恢复（防止次日仍显示昨天的恢复状态）
+    const savedDate = localStorage.getItem("fit_recovery_date");
+    if (savedDate === new Date().toDateString() && p.recovering) {
+      p.recovering.forEach((k) => {
+        document.querySelectorAll(`#muscle-recovery-grid input[value="${k}"]`)
+          .forEach((el) => (el.checked = true));
+      });
+    }
   }
 
   document.addEventListener("DOMContentLoaded", () => {
