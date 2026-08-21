@@ -92,6 +92,13 @@
   .plan-table .ex-act{width:60px;text-align:right}
   footer{max-width:1100px;margin:24px auto;padding:0 18px;color:var(--muted);font-size:12px}
   a{color:var(--accent2)}
+  /* 生理周期横幅 */
+  .cycle-opt{color:var(--muted);font-size:12px;font-weight:400;margin-left:4px}
+  .cycle-banner{margin:8px 0;padding:10px 14px;border-radius:9px;font-size:13px;line-height:1.6;border-left:3px solid}
+  .cycle-banner.cycle-menstrual{background:rgba(255,80,80,.1);border-color:#ff6b6b}
+  .cycle-banner.cycle-follicular{background:rgba(250,200,0,.1);border-color:#e6b800}
+  .cycle-banner.cycle-ovulatory{background:rgba(61,220,151,.1);border-color:var(--ok)}
+  .cycle-banner.cycle-luteal{background:rgba(255,140,0,.1);border-color:#ff8c00}
   @media print{
     header,.controls,.form,.btn-row,.count,#modal{display:none!important}
     body{background:#fff;color:#000}
@@ -245,6 +252,22 @@
         <div class="field wide">
           <label>伤病史 / 限制（选填）</label>
           <textarea id="s-limit" rows="2" placeholder="可留空。填写后系统会自动避开相关高风险动作。"></textarea>
+        </div>
+        <div class="field wide">
+          <label>生理周期参考<span class="cycle-opt">（女性可选）</span></label>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label class="chip"><input type="checkbox" id="s-use-cycle"><span>启用周期模式</span></label>
+            <span class="lhint">系统将根据月经周期阶段自动调整训练强度与内容</span>
+          </div>
+          <div id="cycle-panel" style="display:none;margin-top:10px">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13px;color:var(--muted);white-space:nowrap">上次月经第 1 天：</span>
+              <input type="date" id="s-period-date">
+              <span id="cycle-calc-result" class="lhint"></span>
+            </div>
+            <div class="lhint" style="margin:8px 0 5px">不知道日期？直接选择当前阶段：</div>
+            <div id="cycle-phase-chips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
         </div>
       </div>
       <div class="btn-row">

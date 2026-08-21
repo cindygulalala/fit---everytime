@@ -70,6 +70,59 @@
     neck:         ["颈部各方向静态拉伸（各 20 秒）"]
   };
 
+  // 生理周期阶段及对应训练调整
+  const CYCLE_PHASES = {
+    menstrual: {
+      name: "月经期", days: "第 1–5 天", emoji: "🔴",
+      note: "雌激素和孕激素均处于低点，体力偏弱，可能有腹部不适。建议以轻量训练为主，避免大重量和腹部高负荷动作。",
+      altSuggestion: "如有痛经，可改为瑜伽或温和拉伸",
+      srOverride: { sets: "2", reps: "12-15", rest: "60-90 秒（轻量）" },
+      excludeMuscles: ["core"],   // 避开腹部
+      capEnergy: true,            // 即使用户选"充沛"也不提升强度
+    },
+    follicular: {
+      name: "卵泡期", days: "第 6–13 天", emoji: "🟡",
+      note: "雌激素持续上升，体力和力量逐渐恢复提升，是渐进超负荷、增加训练量的好时机。",
+      altSuggestion: null,
+      srOverride: null,
+      excludeMuscles: [],
+      capEnergy: false,
+    },
+    ovulatory: {
+      name: "排卵期", days: "第 14–16 天", emoji: "🟢",
+      note: "雌激素达到峰值，体力、协调性与力量均处于最优状态，适合高强度力量训练。注意：此期关节韧带略有松弛，大重量动作需更专注稳定性。",
+      altSuggestion: "可适当挑战个人最大重量记录",
+      srOverride: null,
+      excludeMuscles: [],
+      capEnergy: false,
+    },
+    luteal: {
+      name: "黄体期", days: "第 17–28 天", emoji: "🟠",
+      note: "孕激素升高，体温偏高，容易感到疲劳和水肿，建议维持中等强度训练，有氧耐力表现相对较好，避免力竭冲击。",
+      altSuggestion: "感到明显疲劳时可适当减少 1-2 组",
+      srOverride: null,
+      excludeMuscles: [],
+      capEnergy: false,
+    },
+  };
+
+  // 根据上次月经日期推算当前周期阶段（默认 28 天周期）
+  function calcCyclePhaseFromDate(dateStr) {
+    if (!dateStr) return null;
+    const last = new Date(dateStr + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((today - last) / 86400000);
+    if (diffDays < 0 || diffDays > 90) return null;  // 日期不合理
+    const cycleDay = (diffDays % 28) + 1;
+    let phase;
+    if (cycleDay <= 5) phase = "menstrual";
+    else if (cycleDay <= 13) phase = "follicular";
+    else if (cycleDay <= 16) phase = "ovulatory";
+    else phase = "luteal";
+    return { phase, cycleDay };
+  }
+
   // 自动推荐部位组合（当用户未选择时）
   const AUTO_FOCUS_COMBOS = [
     ["chest", "upper arms"],
@@ -235,6 +288,26 @@
     // 今日单次：生成 & 打印
     $("#s-gen-btn").addEventListener("click", onGenerateSingle);
     $("#s-print-btn").addEventListener("click", () => window.print());
+
+    // 生理周期：toggle 显示/隐藏面板
+    $("#s-use-cycle").addEventListener("change", function () {
+      $("#cycle-panel").style.display = this.checked ? "" : "none";
+    });
+
+    // 生理周期：日期输入 → 自动推算并选中对应阶段
+    $("#s-period-date").addEventListener("change", function () {
+      updateCycleCalcDisplay(this.value);
+    });
+
+    // 生理周期阶段 chips（单选）
+    const cycleChipsBox = $("#cycle-phase-chips");
+    ["menstrual", "follicular", "ovulatory", "luteal"].forEach((phase) => {
+      const cp = CYCLE_PHASES[phase];
+      const lab = document.createElement("label");
+      lab.className = "chip";
+      lab.innerHTML = `<input type="radio" name="s-cycle-phase" value="${phase}"><span>${cp.emoji} ${cp.name}（${cp.days}）</span>`;
+      cycleChipsBox.appendChild(lab);
+    });
 
     // 主 Tab 切换（仅响应有 data-tab 属性的按钮）
     $$(".tab[data-tab]").forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -514,6 +587,19 @@
     if (p.limitations) $("#p-limit").value = p.limitations;
   }
 
+  // 更新周期推算显示并自动选中对应阶段 chip
+  function updateCycleCalcDisplay(dateStr) {
+    const display = $("#cycle-calc-result");
+    if (!display) return;
+    const result = calcCyclePhaseFromDate(dateStr);
+    if (!result) { display.textContent = ""; return; }
+    const cp = CYCLE_PHASES[result.phase];
+    display.textContent = `→ 推算第 ${result.cycleDay} 天，${cp.emoji} ${cp.name}`;
+    // 自动选中对应阶段单选
+    const radio = document.querySelector(`input[name="s-cycle-phase"][value="${result.phase}"]`);
+    if (radio) radio.checked = true;
+  }
+
   function switchTab(tab) {
     $$(".tab[data-tab]").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
     $("#sec-learn").style.display = tab === "learn" ? "" : "none";
@@ -531,6 +617,21 @@
 
   /* ---------- 今日单次训练（规格逻辑二） ---------- */
   function onGenerateSingle() {
+    // 读取生理周期信息
+    let cyclePhase = null;
+    let periodDate = "";
+    if ($("#s-use-cycle") && $("#s-use-cycle").checked) {
+      periodDate = $("#s-period-date") ? $("#s-period-date").value : "";
+      if (periodDate) {
+        const calc = calcCyclePhaseFromDate(periodDate);
+        if (calc) cyclePhase = calc.phase;
+      }
+      if (!cyclePhase) {
+        const radio = document.querySelector("input[name='s-cycle-phase']:checked");
+        if (radio) cyclePhase = radio.value;
+      }
+    }
+
     const p = {
       goal:        $("#s-goal").value,
       equipment:   $("#s-equip").value,
@@ -538,7 +639,10 @@
       energy:      $("#s-energy").value,
       lang:        $("#s-lang").value,
       recovering:  $$("#muscle-recovery-grid input:checked").map((c) => c.value),
-      limitations: $("#s-limit").value || ""
+      limitations: $("#s-limit").value || "",
+      cyclePhase,
+      periodDate,
+      useCycle: !!(cyclePhase),
     };
     saveSingleProfile(p);
     const out = buildSingleSession(p);
@@ -602,7 +706,47 @@
 
     if (!exercises.length) return `<p class="warn">没有匹配的动作，请放宽器械条件。</p>`;
 
-    return renderSingleSession(exercises, p, ec, sr, risk.notes, selected, reason, intensityNote);
+    // Step 5（规格扩展）：生理周期阶段调整
+    let cycleBannerHtml = "";
+    if (p.cyclePhase && CYCLE_PHASES[p.cyclePhase]) {
+      const cp = CYCLE_PHASES[p.cyclePhase];
+
+      // 过滤禁忌肌群（月经期避免腹部）
+      if (cp.excludeMuscles && cp.excludeMuscles.length) {
+        const before = exercises.length;
+        exercises = exercises.filter((x) => !cp.excludeMuscles.includes(x.muscle));
+        // 如果过滤后动作不足，从其他已恢复肌群补充
+        if (exercises.length < 2 && before > 0) {
+          const fallback = sorted.find(
+            (mg) => !cp.excludeMuscles.includes(mg.key) && !selected.some((s) => s.key === mg.key)
+          );
+          if (fallback) {
+            const fn = MUSCLE_EX_FILTER[fallback.key];
+            if (fn) {
+              shuffle(pool.filter(fn)).slice(0, 3).forEach((e) =>
+                exercises.push({ ex: e, muscle: fallback.key })
+              );
+            }
+          }
+        }
+      }
+
+      // 月经期：即使用户选了"充沛"也不应用高强度提示，改为友好提示
+      if (cp.capEnergy && p.energy === "充沛") {
+        intensityNote = "月经期建议避免最大强度冲击，已自动调整为正常训练量。";
+      }
+
+      // 覆盖组次
+      if (cp.srOverride) sr = { ...sr, ...cp.srOverride };
+
+      // 构建周期横幅
+      cycleBannerHtml = `<div class="cycle-banner cycle-${p.cyclePhase}">
+        ${cp.emoji} <b>${esc(cp.name)}（${esc(cp.days)}）</b>：${esc(cp.note)}
+        ${cp.altSuggestion ? `<div style="margin-top:3px;opacity:.85">💡 ${esc(cp.altSuggestion)}</div>` : ""}
+      </div>`;
+    }
+
+    return renderSingleSession(exercises, p, ec, sr, risk.notes, selected, reason, intensityNote, cycleBannerHtml);
   }
 
   function renderActiveRecovery() {
@@ -624,7 +768,7 @@
       </div>`;
   }
 
-  function renderSingleSession(exercises, p, ec, sr, riskNotes, selectedMuscles, reason, intensityNote) {
+  function renderSingleSession(exercises, p, ec, sr, riskNotes, selectedMuscles, reason, intensityNote, cycleBannerHtml) {
     const focusTxt = selectedMuscles.map((mg) => mg.label).join(" + ");
     const goalTxt = GOAL_LABEL[p.goal] || p.goal;
 
@@ -661,6 +805,7 @@
           <span>状态:${esc(ec.label)}</span>
         </div>
         <div class="routine" style="margin-top:6px;color:var(--accent2)">💡 ${reason}</div>
+        ${cycleBannerHtml || ""}
         ${riskHtml}
         ${energyHtml}
       </div>
@@ -700,13 +845,26 @@
     if (p.energy)      $("#s-energy").value = p.energy;
     if (p.lang)        $("#s-lang").value = p.lang;
     if (p.limitations) $("#s-limit").value = p.limitations;
-    // 恢复状态：仅当保存于今天时恢复（防止次日仍显示昨天的恢复状态）
+    // 肌群恢复状态：仅当保存于今天时恢复（防止次日残留）
     const savedDate = localStorage.getItem("fit_recovery_date");
     if (savedDate === new Date().toDateString() && p.recovering) {
       p.recovering.forEach((k) => {
         document.querySelectorAll(`#muscle-recovery-grid input[value="${k}"]`)
           .forEach((el) => (el.checked = true));
       });
+    }
+    // 生理周期设置恢复
+    if (p.useCycle) {
+      const useCycleEl = $("#s-use-cycle");
+      const panel = $("#cycle-panel");
+      if (useCycleEl) { useCycleEl.checked = true; if (panel) panel.style.display = ""; }
+      if (p.periodDate) {
+        const pdEl = $("#s-period-date");
+        if (pdEl) { pdEl.value = p.periodDate; updateCycleCalcDisplay(p.periodDate); }
+      } else if (p.cyclePhase) {
+        const radio = document.querySelector(`input[name="s-cycle-phase"][value="${p.cyclePhase}"]`);
+        if (radio) radio.checked = true;
+      }
     }
   }
 
